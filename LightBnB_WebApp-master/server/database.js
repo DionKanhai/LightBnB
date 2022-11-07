@@ -111,15 +111,66 @@ exports.getAllReservations = getAllReservations;
 
 const getAllProperties = (options, limit = 10) => {
 
+  // set up an arr to hold parameters that are available for the query
+  const queryParams = [];
+
+  // start query with all info that comes before the WHERE clause
+  let queryString = `SELECT properties.*, avg(property_reviews.rating) as average_rating
+  FROM properties
+  JOIN property_reviews ON properties.id = property_id
+  WHERE 1 = 1`;
+
+  //check if a city has been passed in the option
+  if (options.city) {
+    // add the city to the params arr
+    queryParams.push(`%${options.city}%`);
+    //create the query string for the city
+    queryString += ` AND city LIKE $${queryParams.length}`;
+  }
+
+  if (options.owner_id) {
+    // add the owner id to the params arr
+    queryParams.push(`${options.owner_id}`);
+    //create the query string for the owner id
+    queryString += ` AND owner_id = $${queryParams.length}`;
+  }
+
+  // check if a min price has been passed in the option
+  if (options.minimum_price_per_night) {
+    // add the min price to the params arr
+    queryParams.push(`${options.minimum_price_per_night}`);
+    //create the query string for the min price
+    queryString += ` AND cost_per_night >= $${queryParams.length}`;
+  }
+
+  //check if a max price has been passed in the option
+  if (options.maximum_price_per_night) {
+    // add the max to the params arr
+    queryParams.push(`${options.maximum_price_per_night}`);
+    //create the query string for the max price
+    queryString += ` AND cost_per_night <= $${queryParams.length}`;
+  }
+ 
+  queryString += `
+  GROUP BY properties.id`
+
+  // check if a min rating has been passed in the options
+  if (options.minimum_rating) {
+    // add the min rating to the params arr
+    queryParams.push(`${options.minimum_rating}`);
+    //create the query string for the min rating
+    queryString += ` HAVING average_rating >= $${queryParams.length}`;
+  }
+  queryParams.push(limit = 10);
+  queryString += `
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length}`;
+
+  //run the query
   return pool
-    .query(`SELECT * FROM properties LIMIT $1`,
-    [limit = 10])
-    .then((result) => {
-      return result.rows
-    })
-    .catch((err) => {
-      console.log(err.message);
-    });
+  .query(queryString, queryParams)
+  .then((res) => res.rows);
+
 };
 exports.getAllProperties = getAllProperties;
 
